@@ -40,30 +40,42 @@ async function run() {
       const post = req.body;
       const result = await volunteerCollection.insertOne(post);
       res.json(result);
-    }); 
-    
+    });
+
     // update volunteer
-    // app.patch("/volunteers/:id", async (req, res) => {
-    //   const id = req.params.id;
-    //   const update = req.body;
-    //   const result = await volunteerCollection.updateOne(
-    //     { _id: new ObjectId(id) },
-    //     { $set: update }
-    //   );
-    //   res.json(result);
-    // });
+    app.put("/volunteers/:id", async (req, res) => {
+      const id = req.params.id;
+      const update = req.body;
+      const result = await volunteerCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: update },
+        { upsert: true }
+      );
+      res.json(result);
+    });
+
     // delete volunteer
-    // app.delete("/volunteers/:id", async (req, res) => {
-    //   const id = req.params.id;
-    //   const result = await volunteerCollection.deleteOne({
-    //     _id: new ObjectId(id),
-    //   });
-    //   res.json(result);
-    // });
+    app.delete("/volunteers/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await volunteerCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.json(result);
+    });
 
     // all volunteers
     app.get("/volunteers", async (req, res) => {
       const result = await volunteerCollection.find().toArray();
+      res.send(result);
+    });
+
+    // all posts by different user
+    app.get("/my_post", async (req, res) => {
+      const result = await volunteerCollection
+        .find({
+          "organizer.email": req.query.email,
+        })
+        .toArray();
       res.send(result);
     });
 
