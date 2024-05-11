@@ -35,11 +35,38 @@ async function run() {
     const requestedCollection = client.db("careCrew").collection("requests");
 
     /************ CRUD **************/
+    // add volunteer
+    app.post("/volunteers", async (req, res) => {
+      const post = req.body;
+      const result = await volunteerCollection.insertOne(post);
+      res.json(result);
+    }); 
+    
+    // update volunteer
+    // app.patch("/volunteers/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const update = req.body;
+    //   const result = await volunteerCollection.updateOne(
+    //     { _id: new ObjectId(id) },
+    //     { $set: update }
+    //   );
+    //   res.json(result);
+    // });
+    // delete volunteer
+    // app.delete("/volunteers/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const result = await volunteerCollection.deleteOne({
+    //     _id: new ObjectId(id),
+    //   });
+    //   res.json(result);
+    // });
+
     // all volunteers
     app.get("/volunteers", async (req, res) => {
       const result = await volunteerCollection.find().toArray();
       res.send(result);
     });
+
     // single volunteer by id
     app.get("/volunteers/:id", async (req, res) => {
       const id = req.params.id;
@@ -48,6 +75,22 @@ async function run() {
       });
       res.send(result);
     });
+
+    // search volunteers by title and category
+    app.get("/AllVolunteer", async (req, res) => {
+      const search = req.query.search;
+      let query = {
+        $or: [
+          {
+            postTitle: { $regex: search, $options: "i" },
+          },
+          { category: { $regex: search, $options: "i" } },
+        ],
+      };
+      const result = await volunteerCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // add requests
     app.post("/requests", async (req, res) => {
       const post = req.body;
@@ -69,6 +112,7 @@ async function run() {
       const result = await requestedCollection.insertOne(post);
       res.send(result);
     });
+
     // all requests
     app.get("/requests", async (req, res) => {
       const result = await requestedCollection.find().toArray();
