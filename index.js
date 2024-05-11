@@ -28,11 +28,11 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-
 async function run() {
   try {
     await client.connect();
     const volunteerCollection = client.db("careCrew").collection("volunteers");
+    const requestedCollection = client.db("careCrew").collection("requests");
 
     /************ CRUD **************/
     // all volunteers
@@ -40,6 +40,41 @@ async function run() {
       const result = await volunteerCollection.find().toArray();
       res.send(result);
     });
+    // single volunteer by id
+    app.get("/volunteers/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await volunteerCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+    // add requests
+    app.post("/requests", async (req, res) => {
+      const post = req.body;
+      const checked = await requestedCollection.findOne({
+        postId: post.postId,
+        "volunteer.email": post.volunteer.email,
+      });
+      if (checked) {
+        return res.send({ error: "Already Requested!" });
+      }
+      const decreaseNeed = await volunteerCollection.updateOne(
+        {
+          _id: new ObjectId(post.postId),
+        },
+        {
+          $inc: { volunteersNeeded: -1 },
+        }
+      );
+      const result = await requestedCollection.insertOne(post);
+      res.send(result);
+    });
+    // all requests
+    app.get("/requests", async (req, res) => {
+      const result = await requestedCollection.find().toArray();
+      res.send(result);
+    });
+
     /************ CRUD ****************/
 
     await client.db("admin").command({ ping: 1 });
