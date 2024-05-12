@@ -65,8 +65,15 @@ async function run() {
 
     // all volunteers
     app.get("/volunteers", async (req, res) => {
-      const result = await volunteerCollection.find().toArray();
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
+      const result = await volunteerCollection.find().skip(page*size).limit(size).toArray();
       res.send(result);
+    });
+    // count volunteers
+    app.get("/volunteers_count", async (req, res) => {
+      const count = await volunteerCollection.countDocuments();
+      res.send({ count });
     });
 
     // all posts by different user
