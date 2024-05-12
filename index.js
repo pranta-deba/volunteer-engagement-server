@@ -21,18 +21,63 @@ const client = new MongoClient(uri, {
 // middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://carecrew-f18ce.web.app",
+      "https://carecrew-f18ce.firebaseapp.com/",
+    ],
     credentials: true,
   })
 );
 app.use(express.json());
 app.use(cookieParser());
 
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).send({ message: "unauthorized access" });
+  if (token) {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      if (err) {
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      req.user = decoded;
+      next();
+    });
+  }
+};
+
 async function run() {
   try {
     await client.connect();
     const volunteerCollection = client.db("careCrew").collection("volunteers");
     const requestedCollection = client.db("careCrew").collection("requests");
+
+    /**************** TOKEN ***************/
+    // add cookie
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "365d",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
+    // clear cookie ui
+    app.get("/logOut", (req, res) => {
+      res.clearCookie("token", {
+        httpOnly: true,
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 0,
+      });
+      res.send({ success: true });
+    });
+    /**************** TOKEN ***************/
 
     /************ CRUD **************/
     // add volunteer
@@ -67,7 +112,11 @@ async function run() {
     app.get("/volunteers", async (req, res) => {
       const page = parseInt(req.query.page);
       const size = parseInt(req.query.size);
-      const result = await volunteerCollection.find().skip(page*size).limit(size).toArray();
+      const result = await volunteerCollection
+        .find()
+        .skip(page * size)
+        .limit(size)
+        .toArray();
       res.send(result);
     });
     // count volunteers
@@ -77,7 +126,11 @@ async function run() {
     });
 
     // all posts by different user
-    app.get("/my_post", async (req, res) => {
+    app.get("/my_post", verifyToken, async (req, res) => {
+      const tokenEmail = req.user.email;
+      if (tokenEmail !== req.query.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const result = await volunteerCollection
         .find({
           "organizer.email": req.query.email,
@@ -160,8 +213,12 @@ async function run() {
     });
 
     // you requested post
-    app.get("/my_requests", async (req, res) => {
+    app.get("/my_requests", verifyToken, async (req, res) => {
       const email = req.query.email;
+      const tokenEmail = req.user.email;
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const result = await requestedCollection
         .find({
           "volunteer.email": email,
