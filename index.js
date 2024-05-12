@@ -106,6 +106,7 @@ async function run() {
     // add requests
     app.post("/requests", async (req, res) => {
       const post = req.body;
+      const id = req.query.postId;
       const checked = await requestedCollection.findOne({
         postId: post.postId,
         "volunteer.email": post.volunteer.email,
@@ -113,9 +114,15 @@ async function run() {
       if (checked) {
         return res.send({ error: "Already Requested!" });
       }
+      const neededCount = await volunteerCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      if (neededCount.volunteersNeeded < 1) {
+        return res.send({ error: "No Volunteers Needed!" });
+      }
       const decreaseNeed = await volunteerCollection.updateOne(
         {
-          _id: new ObjectId(post.postId),
+          _id: new ObjectId(id),
         },
         {
           $inc: { volunteersNeeded: -1 },
@@ -125,9 +132,51 @@ async function run() {
       res.send(result);
     });
 
-    // all requests
+    // all requests by different user
     app.get("/requests", async (req, res) => {
-      const result = await requestedCollection.find().toArray();
+      const email = req.query.email;
+      const query = { "organizer.email": email };
+      const result = await requestedCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // request status updated by owner
+    app.put("/requests/:id", async (req, res) => {
+      const id = req.params.id;
+      const update = req.body;
+      const result = await requestedCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: update },
+        { upsert: true }
+      );
+      res.json(result);
+    });
+
+    // you requested post
+    app.get("/my_requests", async (req, res) => {
+      const email = req.query.email;
+      const result = await requestedCollection
+        .find({
+          "volunteer.email": email,
+        })
+        .toArray();
+      res.send(result);
+    });
+    // delete request
+    app.delete("/requests/:id", async (req, res) => {
+      const deleteId = req.params.id;
+      const updateId = req.query.id;
+      const increaseNeed = await volunteerCollection.updateOne(
+        {
+          _id: new ObjectId(updateId),
+        },
+        {
+          $inc: { volunteersNeeded: +1 },
+        }
+      );
+      const result = await requestedCollection.deleteOne({
+        _id: new ObjectId(deleteId),
+      });
       res.send(result);
     });
 
