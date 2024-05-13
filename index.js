@@ -48,9 +48,10 @@ const verifyToken = (req, res, next) => {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const volunteerCollection = client.db("careCrew").collection("volunteers");
     const requestedCollection = client.db("careCrew").collection("requests");
+    const userCollection = client.db("careCrew").collection("users");
 
     /**************** TOKEN ***************/
     // add cookie
@@ -193,8 +194,12 @@ async function run() {
     });
 
     // all requests by different user
-    app.get("/requests", async (req, res) => {
+    app.get("/requests", verifyToken, async (req, res) => {
       const email = req.query.email;
+      const tokenEmail = req.user.email;
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const query = { "organizer.email": email };
       const result = await requestedCollection.find(query).toArray();
       res.send(result);
@@ -246,7 +251,54 @@ async function run() {
 
     /************ CRUD ****************/
 
-    await client.db("admin").command({ ping: 1 });
+    /************ USER ****************/
+    // create a new user
+    app.post("/users", async (req, res) => {
+      const post = req.body;
+      const result = await userCollection.insertOne(post);
+      res.json(result);
+    });
+    // single user
+    app.get("/users", verifyToken, async (req, res) => {
+      const email = req.query.email;
+      const tokenEmail = req.user.email;
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const result = await userCollection.findOne({
+        email: email,
+      });
+      if (!result) {
+        return res.send({});
+      }
+      res.send(result);
+    });
+    // update user
+    app.put("/users", async (req, res) => {
+      const update = req.body;
+      const email = req.body.email;
+      const updateData = {
+        birthday: update.birthday,
+        address: update.address,
+        phone: update.phone,
+      };
+      const exits = await userCollection.findOne({
+        email: email,
+      });
+      if (!exits) {
+        const create = await userCollection.insertOne(update);
+        return res.json(create);
+      }
+      const result = await userCollection.updateOne(
+        { email: email },
+        { $set: updateData },
+        { upsert: true }
+      );
+      res.json(result);
+    });
+    /************ USER ****************/
+
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
