@@ -52,6 +52,7 @@ async function run() {
     const volunteerCollection = client.db("careCrew").collection("volunteers");
     const requestedCollection = client.db("careCrew").collection("requests");
     const userCollection = client.db("careCrew").collection("users");
+    const reviewCollection = client.db("careCrew").collection("reviews");
 
     /**************** TOKEN ***************/
     // add cookie
@@ -246,6 +247,18 @@ async function run() {
       const result = await requestedCollection.deleteOne({
         _id: new ObjectId(deleteId),
       });
+      res.send(result);
+    });
+
+    // add review
+    app.post("/reviews", async (req, res) => {
+      const post = req.body;
+      const result = await reviewCollection.insertOne(post);
+      res.json(result);
+    });
+    // get reviews
+    app.get("/reviews", async (req, res) => {
+      const result = await reviewCollection.find().toArray();
       res.send(result);
     });
 
